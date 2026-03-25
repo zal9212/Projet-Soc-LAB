@@ -1,0 +1,11 @@
+.env
+# Logs Suricata : trop volumineux et contiennent des donnees sensibles
+suricata/logs/*.json
+suricata/logs/*.log
+suricata/logs/*.pcap
+
+# Fichiers temporaires systeme
+*.tmp
+*.bak
+__pycache__/
+.DS_Store
