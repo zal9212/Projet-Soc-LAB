@@ -1,0 +1,179 @@
+version: "3.9"
+
+# ============================================================
+# SOC Lab - Stack Docker Compose Complète
+# ============================================================
+
+networks:
+  soc-frontend:
+    driver: bridge
+  soc-backend:
+    driver: bridge
+
+volumes:
+  wazuh-data:
+  grafana-data:
+  thehive-data:
+  cassandra-data:
+
+services:
+
+  # ============================================================
+  # SERVICE 1 : WAZUH MANAGER
+  # ============================================================
+  wazuh-manager:
+    image: wazuh/wazuh-manager:4.7.5
+    container_name: wazuh-manager
+    hostname: wazuh-manager
+    restart: unless-stopped
+    ports:
+      - "1514:1514/udp"
+      - "1515:1515/tcp"
+      - "55000:55000/tcp"
+    environment:
+      - WAZUH_MANAGER_PASSWORD=${WAZUH_MANAGER_PASSWORD}
+      - INDEXER_PASSWORD=${WAZUH_INDEXER_PASSWORD}
+    volumes:
+      - wazuh-data:/var/ossec/data
+      - ./wazuh/config:/wazuh-config-mount:ro
+      - ./config/filebeat.yml:/etc/filebeat/filebeat.yml
+    networks:
+      - soc-backend
+    depends_on:
+      - wazuh-indexer
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/55000' 2>/dev/null && exit 0 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
+  # ============================================================
+  # SERVICE 1b : WAZUH INDEXER (OpenSearch/Elasticsearch)
+  # ============================================================
+  wazuh-indexer:
+    image: wazuh/wazuh-indexer:4.7.5
+    container_name: wazuh-indexer
+    hostname: wazuh.indexer
+    restart: unless-stopped
+    environment:
+      - INDEXER_PASSWORD=${WAZUH_INDEXER_PASSWORD}
+      - discovery.type=single-node
+    ports:
+      - "9200:9200"
+    volumes:
+      - ./wazuh/indexer-data:/var/lib/wazuh-indexer
+    networks:
+      - soc-backend
+
+  # ============================================================
+  # SERVICE 2 : WAZUH DASHBOARD
+  # ============================================================
+  wazuh-dashboard:
+    image: wazuh/wazuh-dashboard:4.7.5
+    container_name: wazuh-dashboard
+    restart: unless-stopped
+    ports:
+      - "443:5601"
+    environment:
+      - WAZUH_API_URL=https://wazuh-manager
+      - API_USERNAME=${WAZUH_API_USER}
+      - API_PASSWORD=${WAZUH_API_PASSWORD}
+    depends_on:
+      wazuh-manager:
+        condition: service_healthy
+    networks:
+      - soc-frontend
+      - soc-backend
+
+  # ============================================================
+  # SERVICE 3 : SURICATA
+  # ============================================================
+  suricata:
+    image: jasonish/suricata:latest
+    container_name: suricata
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_NICE
+    volumes:
+      - ./suricata/rules:/etc/suricata/rules
+      - ./suricata/logs:/var/log/suricata
+    command: -i eth0 --init-errors-fatal
+
+  # ============================================================
+  # SERVICE 4 : GRAFANA
+  # ============================================================
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "${GRAFANA_PORT}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+    networks:
+      - soc-frontend
+      - soc-backend
+
+  # ============================================================
+  # SERVICE 5a : CASSANDRA
+  # ============================================================
+  cassandra:
+    image: cassandra:4.1
+    container_name: cassandra
+    restart: unless-stopped
+    environment:
+      - CASSANDRA_CLUSTER_NAME=${CASSANDRA_CLUSTER_NAME}
+      - CASSANDRA_PASSWORD=${CASSANDRA_PASSWORD}
+    volumes:
+      - cassandra-data:/var/lib/cassandra
+    networks:
+      - soc-backend
+    healthcheck:
+      test: ["CMD", "cqlsh", "-e", "describe keyspaces"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+
+  # ============================================================
+  # SERVICE 5b : THEHIVE
+  # ============================================================
+  thehive:
+    image: strangebee/thehive:5.3
+    container_name: thehive
+    restart: unless-stopped
+    ports:
+      - "${THEHIVE_PORT}:9000"
+    environment:
+      - SECRET_KEY=${THEHIVE_SECRET_KEY}
+      - CQL_HOSTNAMES=cassandra
+    depends_on:
+      cassandra:
+        condition: service_healthy
+    networks:
+      - soc-frontend
+      - soc-backend
+    volumes:
+      - thehive-data:/opt/thehive/data
+
+  # ============================================================
+  # SERVICE 6 : DVWA
+  # ============================================================
+  dvwa:
+    image: vulnerables/web-dvwa
+    container_name: dvwa
+    restart: unless-stopped
+    ports:
+      - "${DVWA_PORT}:80"
+    networks:
+      - soc-backend
+
