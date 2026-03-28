@@ -1,20 +1,35 @@
-SOC Lab Conteneurisé
+# SOC Lab Conteneurisé
+
 Projet de fin de module — Cloud et Infrastructures Virtuelles
 L2 SIMAC | Dr GUEYE
 
+---
 
-Stack
-ServiceRôlePortWazuh ManagerSIEM & détection d’intrusion55000Wazuh IndexerBase de données des alertes9200Tableau de bord WazuhInterface de visualisation443SuricataIDS réseau—GrafanaTableaux de bord3000TheHiveGestion des incidents9000DVWACible d’attaque8080
+## Stack
 
-Prérequis
+| Service | Rôle | Port |
+|---|---|---|
+| Wazuh Manager | SIEM & détection d'intrusion | 55000 |
+| Wazuh Indexer | Base de données des alertes | 9200 |
+| Wazuh Dashboard | Interface de visualisation | 443 |
+| Suricata | IDS réseau | — |
+| Grafana | Tableaux de bord | 3000 |
+| TheHive | Gestion des incidents | 9000 |
+| DVWA | Cible d'attaque | 8080 |
 
-Docker >= 24.0 et Docker Compose >= 2.0
-RAM minimum : 8 Go
-Linux (testé sur Kali Linux)
+---
 
+## Prérequis
 
-Installation
-Bash# 1. Cloner le dépôt
+- Docker >= 24.0 et Docker Compose >= 2.0
+- RAM minimum : 8 Go
+- Linux (testé sur Kali Linux)
+
+---
+
+## Installation
+```bash
+# 1. Cloner le dépôt
 git clone https://github.com/zal9212/Projet-Soc-LAB.git
 cd Projet-Soc-LAB
 
@@ -30,11 +45,23 @@ docker compose up -d
 
 # 5. Vérifier l'état des services
 docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+```
 
-Accès
-ServiceURLIdentifiantsTableau de bord Wazuhtableau de bord, grafana, thehive, dvwaadmin / voir .envGrafanaWazuh-Manager, Wazuh-indexer, CassandraCritiques des stagiaires servicesTheHivehttp://localhost:9000admin@thehive.local / secretDVWAhttp://localhost:8080admin / mot de passe
+---
 
-Structure
+## Accès
+
+| Service | URL | Identifiants |
+|---|---|---|
+| Wazuh Dashboard | https://localhost | admin / voir .env |
+| Grafana | http://localhost:3000 | admin / voir .env |
+| TheHive | http://localhost:9000 | admin@thehive.local / secret |
+| DVWA | http://localhost:8080 | admin / password |
+
+---
+
+## Structure
+```
 .
 ├── docker-compose.yml
 ├── .env.example
@@ -45,9 +72,12 @@ Structure
 ├── grafana/
 ├── thehive/
 └── rapport/
+```
 
-Sécurité
+---
 
-Docker >= 24,0
-Deux réseaux isolés : soc-frontend et soc-backend
-Aucun mot de passe en dur dans docker-compose.yml# Projet-Soc-LAB
+## Sécurité
+
+- Les secrets sont externalisés dans `.env` (non commité)
+- Deux réseaux isolés : `soc-frontend` et `soc-backend`
+- Aucun mot de passe en dur dans `docker-compose.yml`
